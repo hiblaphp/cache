@@ -2,15 +2,9 @@
 
 **Async-first cache primitives for the Hibla ecosystem.**
 
-A Promise-based cache abstraction built on top of
-[hiblaphp/promise](https://github.com/hiblaphp/promise). All operations
-return a `Promise` rather than a raw value, making cache reads and writes
-first-class participants in async workflows — composable with `await()`,
-`Promise::all()`, and the rest of the Hibla promise API.
+A Promise-based cache abstraction built on top of [hiblaphp/promise](https://github.com/hiblaphp/promise). All operations return a `Promise` rather than a raw value, making cache reads and writes first-class participants in async workflows, composable with `await()`, `Promise::all()`, and the rest of the Hibla promise API.
 
-Ships with an in-memory `ArrayCache` implementation with LRU eviction and
-nanosecond-precision TTL, and a `CacheInterface` for building or swapping in
-other backends.
+Ships with an in-memory `ArrayCache` implementation with LRU eviction and nanosecond-precision TTL, and a `CacheInterface` for building or swapping in other backends.
 
 [![Latest Release](https://img.shields.io/github/release/hiblaphp/cache.svg?style=flat-square)](https://github.com/hiblaphp/cache/releases)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
@@ -64,20 +58,9 @@ composer require hiblaphp/cache
 
 ## Introduction
 
-Most cache APIs in PHP return raw values directly. This works fine for
-synchronous code, but as soon as you want to use a cache inside an async
-workflow — alongside HTTP requests, database queries, or other in-flight
-work — a synchronous return value breaks the composition model. You cannot
-pass it to `Promise::all()`, you cannot `await()` it alongside other
-operations, and you cannot swap to a remote cache backend later without
-changing every call site.
+Most cache APIs in PHP return raw values directly. This works fine for synchronous code, but as soon as you want to use a cache inside an async workflow (alongside HTTP requests, database queries, or other in-flight work) a synchronous return value breaks the composition model. You cannot pass it to `Promise::all()`, you cannot `await()` it alongside other operations, and you cannot swap to a remote cache backend later without changing every call site.
 
-`hiblaphp/cache` makes every cache operation return a `Promise`. For the
-built-in `ArrayCache` all operations resolve immediately — there is no actual
-async work happening under the hood. But the interface is identical to what a
-Redis or Memcached backend would expose. This means your application code
-composes cleanly with the rest of the Hibla async stack today, and swapping
-to a network-backed cache later requires no changes at the call site.
+`hiblaphp/cache` makes every cache operation return a `Promise`. For the built-in `ArrayCache` all operations resolve immediately. There is no actual async work happening under the hood. But the interface is identical to what a Redis or Memcached backend would expose. This means your application code composes cleanly with the rest of the Hibla async stack today, and swapping to a network-backed cache later requires no changes at the call site.
 
 ---
 
@@ -101,9 +84,7 @@ await($cache->delete('user:1'));
 await($cache->clear());
 ```
 
-All methods return a `Promise`. In a synchronous context you can use
-`await()` or `->wait()` to retrieve the resolved value. Inside an `async()`
-block use `await()` to suspend cooperatively:
+All methods return a `Promise`. In a synchronous context you can use `await()` or `->wait()` to retrieve the resolved value. Inside an `async()` block use `await()` to suspend cooperatively:
 ```php
 async(function () use ($cache) {
     $user = await($cache->get('user:1'));
@@ -121,19 +102,13 @@ async(function () use ($cache) {
 
 ## TTL — Expiring Items
 
-Pass a TTL as the third argument to `set()` and `setMultiple()`. Items are
-not actively garbage collected — expiry is checked lazily on the next read
-(`get()`, `getMultiple()`, `has()`). Expired items are also prioritized for
-eviction when the cache is full — see [Eviction priority](#eviction-priority).
+Pass a TTL as the third argument to `set()` and `setMultiple()`. Items are not actively garbage collected. Expiry is checked lazily on the next read (`get()`, `getMultiple()`, `has()`). Expired items are also prioritized for eviction when the cache is full. See [Eviction priority](#eviction-priority).
 
-TTL uses `hrtime()` internally — a monotonic clock that is immune to system
-clock adjustments. This means TTLs are accurate even if the system time
-changes while the cache is running.
+TTL uses `hrtime()` internally, a monotonic clock that is immune to system clock adjustments. This means TTLs are accurate even if the system time changes while the cache is running.
 
 ### Integer and float TTL
 
-Pass an `int` or `float` for a TTL in seconds. Floats allow sub-second
-precision:
+Pass an `int` or `float` for a TTL in seconds. Floats allow sub-second precision:
 ```php
 // Expire after 5 minutes
 await($cache->set('session:abc', $session, 300));
@@ -163,9 +138,7 @@ await($cache->set('session:tmp', $data, new DateInterval('PT30M')));
 
 ## Size Limit and LRU Eviction
 
-Pass a `$limit` to the constructor to cap the number of items the cache will
-hold. When the limit is reached and a new item is added, the cache evicts one
-item to make room before storing the new one:
+Pass a `$limit` to the constructor to cap the number of items the cache will hold. When the limit is reached and a new item is added, the cache evicts one item to make room before storing the new one:
 ```php
 // Hold at most 1000 items
 $cache = new ArrayCache(limit: 1000);
@@ -177,8 +150,7 @@ Without a limit the cache grows without bound:
 $cache = new ArrayCache();
 ```
 
-The minimum valid limit is `1`. Passing `0` or a negative value throws an
-`\InvalidArgumentException`:
+The minimum valid limit is `1`. Passing `0` or a negative value throws an `\InvalidArgumentException`:
 ```php
 $cache = new ArrayCache(limit: 0);  // throws InvalidArgumentException
 $cache = new ArrayCache(limit: -1); // throws InvalidArgumentException
@@ -186,15 +158,11 @@ $cache = new ArrayCache(limit: -1); // throws InvalidArgumentException
 
 ### Eviction priority
 
-When the cache is over the limit, the eviction strategy prefers expired items
-over live ones:
+When the cache is over the limit, the eviction strategy prefers expired items over live ones:
 
-1. **Expired item available** — the item with the earliest expiry timestamp
-   is evicted first, regardless of when it was last accessed. Clearing out a
-   stale item is always preferable to evicting a live one.
-2. **No expired items** — the least recently used item is evicted. Read
-   operations (`get()`, `getMultiple()`) update LRU order on each access.
-   `has()` intentionally does not — see [`has()`](#has--existence-check).
+1. **Expired item available:** the item with the earliest expiry timestamp is evicted first, regardless of when it was last accessed. Clearing out a stale item is always preferable to evicting a live one.
+2. **No expired items:** the least recently used item is evicted. Read operations (`get()`, `getMultiple()`) update LRU order on each access. `has()` intentionally does not. See [`has()`](#has--existence-check).
+
 ```php
 $cache = new ArrayCache(limit: 3);
 
@@ -218,8 +186,7 @@ $a = await($cache->get('a')); // 1 — still present
 
 ### `getMultiple()`
 
-Fetch multiple keys in a single call. Returns an associative array of
-`key => value` pairs. Keys not found in the cache resolve to `$default`:
+Fetch multiple keys in a single call. Returns an associative array of `key => value` pairs. Keys not found in the cache resolve to `$default`:
 ```php
 $results = await($cache->getMultiple(['user:1', 'user:2', 'user:3']));
 
@@ -237,8 +204,7 @@ $results = await($cache->getMultiple(['config:a', 'config:b'], default: []));
 
 ### `setMultiple()`
 
-Store multiple key-value pairs in a single call. All entries share the same
-TTL:
+Store multiple key-value pairs in a single call. All entries share the same TTL:
 ```php
 await($cache->setMultiple([
     'user:1' => $user1,
@@ -258,20 +224,14 @@ await($cache->deleteMultiple(['user:1', 'user:2', 'user:3']));
 
 ## `has()` — Existence Check
 
-`has()` checks whether a key exists in the cache and has not expired. It
-returns `false` for keys that are present but have passed their TTL:
+`has()` checks whether a key exists in the cache and has not expired. It returns `false` for keys that are present but have passed their TTL:
 ```php
 $exists = await($cache->has('user:1')); // true or false
 ```
 
-> **Note:** `has()` intentionally does not update LRU order. It is a
-> lightweight existence check with no side effects — only `get()` and
-> `getMultiple()` promote an item to most-recently-used when the value is
-> actually retrieved.
+> **Note:** `has()` intentionally does not update LRU order. It is a lightweight existence check with no side effects. Only `get()` and `getMultiple()` promote an item to most-recently-used when the value is actually retrieved.
 
-This means checking whether a key exists before fetching it does not disturb
-the eviction order. If you check for a key and then immediately get it, only
-the `get()` updates the LRU position:
+This means checking whether a key exists before fetching it does not disturb the eviction order. If you check for a key and then immediately get it, only the `get()` updates the LRU position:
 ```php
 if (await($cache->has('user:1'))) {       // LRU order unchanged
     $user = await($cache->get('user:1')); // LRU order updated here
@@ -282,15 +242,9 @@ if (await($cache->has('user:1'))) {       // LRU order unchanged
 
 ## Using with `await()`
 
-`await()` is provided by [`hiblaphp/async`](https://github.com/hiblaphp/async)
-— the async/await layer of the Hibla stack. If you have not used it before,
-it is a plain PHP function that suspends the current Fiber until a promise
-settles, or falls back to blocking synchronously when called outside a Fiber.
-See the [hiblaphp/async documentation](https://github.com/hiblaphp/async) for
-a full introduction.
+`await()` is provided by [`hiblaphp/async`](https://github.com/hiblaphp/async), the async/await layer of the Hibla stack. If you have not used it before, it is a plain PHP function that suspends the current Fiber until a promise settles, or falls back to blocking synchronously when called outside a Fiber. See the [hiblaphp/async documentation](https://github.com/hiblaphp/async) for a full introduction.
 
-All `ArrayCache` methods resolve immediately — there is no network round trip.
-`await()` returns the value on the same tick without suspending the Fiber:
+All `ArrayCache` methods resolve immediately. There is no network round trip. `await()` returns the value on the same tick without suspending the Fiber:
 ```php
 use function Hibla\async;
 use function Hibla\await;
@@ -312,9 +266,7 @@ async(function () use ($cache, $userId) {
 
 ## Using with Promise Combinators
 
-Because every operation returns a `Promise`, cache calls compose naturally
-with `Promise::all()` and other combinators. Warm multiple cache entries or
-read multiple keys concurrently alongside other async work:
+Because every operation returns a `Promise`, cache calls compose naturally with `Promise::all()` and other combinators. Warm multiple cache entries or read multiple keys concurrently alongside other async work:
 ```php
 use Hibla\Promise\Promise;
 use function Hibla\await;
@@ -337,19 +289,11 @@ await(Promise::all([
 
 ## No Cancellation Support
 
-`ArrayCache` does not support cancellation and none of its returned promises
-have `onCancel()` handlers registered. This is intentional, not an oversight.
+`ArrayCache` does not support cancellation and none of its returned promises have `onCancel()` handlers registered. This is intentional, not an oversight.
 
-Cancellation is only meaningful when there is real async work in flight —
-an HTTP request that can be aborted, a timer that can be cancelled, a stream
-read that can be stopped. A `CancellationToken` or `promise->cancel()` call
-is useful precisely because it can reach into that in-flight work and stop it
-before it completes.
+Cancellation is only meaningful when there is real async work in flight: an HTTP request that can be aborted, a timer that can be cancelled, a stream read that can be stopped. A `CancellationToken` or `promise->cancel()` call is useful precisely because it can reach into that in-flight work and stop it before it completes.
 
-`ArrayCache` operations are entirely synchronous. Every method completes its
-work — the array read, the LRU update, the expiry check — and calls
-`Promise::resolved()` before returning. The promise is already fulfilled by
-the time the caller receives it. There is nothing in flight to cancel:
+`ArrayCache` operations are entirely synchronous. Every method completes its work (the array read, the LRU update, the expiry check) and calls `Promise::resolved()` before returning. The promise is already fulfilled by the time the caller receives it. There is nothing in flight to cancel:
 ```php
 $promise = $cache->get('user:1');
 // By this line, the array has already been read and the promise is
@@ -358,15 +302,9 @@ $promise = $cache->get('user:1');
 $promise->cancel(); // no-op — isFulfilled() is already true
 ```
 
-This is the same reason `Promise::resolved()` and `Promise::rejected()` do
-not support cancellation — once a promise is already settled, its result is
-final and cancellation has nothing to act on.
+This is the same reason `Promise::resolved()` and `Promise::rejected()` do not support cancellation. Once a promise is already settled, its result is final and cancellation has nothing to act on.
 
-If you are building a cache backend that performs real async I/O — a Redis
-client, a Memcached adapter, or any network-backed implementation of
-`CacheInterface` — you should register `onCancel()` handlers on the deferred
-promises your methods return, wiring cancellation to the underlying connection
-or request abort mechanism:
+If you are building a cache backend that performs real async I/O (a Redis client, a Memcached adapter, or any network-backed implementation of `CacheInterface`) you should register `onCancel()` handlers on the deferred promises your methods return, wiring cancellation to the underlying connection or request abort mechanism:
 ```php
 public function get(string $key, mixed $default = null): PromiseInterface
 {
@@ -384,19 +322,15 @@ public function get(string $key, mixed $default = null): PromiseInterface
 }
 ```
 
-For `ArrayCache` specifically, there is simply nothing to wire cancellation
-to — the work is always already done.
+For `ArrayCache` specifically, there is simply nothing to wire cancellation to. The work is always already done.
 
 ---
 
 ## `CacheInterface`
 
-`CacheInterface` is the contract all cache implementations in the Hibla
-ecosystem implement. All methods return a `PromiseInterface` — this is the
-only requirement that distinguishes it from a PSR-16 synchronous cache.
+`CacheInterface` is the contract all cache implementations in the Hibla ecosystem implement. All methods return a `PromiseInterface`. This is the only requirement that distinguishes it from a PSR-16 synchronous cache.
 
-Type-annotate against the interface rather than a concrete class so you can
-swap implementations without changing call sites:
+Type-annotate against the interface rather than a concrete class so you can swap implementations without changing call sites:
 ```php
 use Hibla\Cache\Interfaces\CacheInterface;
 
@@ -428,10 +362,7 @@ $repo = new UserRepository(new ArrayCache(limit: 500));
 
 ### Implementing your own backend
 
-Implement `CacheInterface` to add a new backend. All methods must return a
-`PromiseInterface` — use `Promise::resolved()` for synchronous results and a
-deferred `Promise` for genuinely async operations. Register `onCancel()`
-handlers on any deferred promises that wrap real in-flight work:
+Implement `CacheInterface` to add a new backend. All methods must return a `PromiseInterface`. Use `Promise::resolved()` for synchronous results and a deferred `Promise` for genuinely async operations. Register `onCancel()` handlers on any deferred promises that wrap real in-flight work:
 ```php
 use Hibla\Cache\Interfaces\CacheInterface;
 use Hibla\Promise\Interfaces\PromiseInterface;
@@ -479,7 +410,7 @@ class RedisCache implements CacheInterface
 
 | Type | Example | Behavior |
 |---|---|---|
-| `null` | `set('k', $v)` | No expiry — item lives until evicted or deleted |
+| `null` | `set('k', $v)` | No expiry, item lives until evicted or deleted |
 | `int` | `set('k', $v, 300)` | Expires after N seconds |
 | `float` | `set('k', $v, 0.5)` | Expires after N seconds, sub-second precision |
 | `DateInterval` | `set('k', $v, new DateInterval('PT1H'))` | Expires after the interval |
