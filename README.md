@@ -7,6 +7,8 @@ A Promise-based cache abstraction built on top of [hiblaphp/promise](https://git
 Ships with an in-memory `ArrayCache` implementation with LRU eviction and nanosecond-precision TTL, and a `CacheInterface` for building or swapping in other backends.
 
 [![Latest Release](https://img.shields.io/github/release/hiblaphp/cache.svg?style=flat-square)](https://github.com/hiblaphp/cache/releases)
+[![Tests](https://github.com/hiblaphp/cache/actions/workflows/test.yml/badge.svg)](https://github.com/hiblaphp/cache/actions/workflows/test.yml)
+[![Total Downloads](https://img.shields.io/packagist/dt/hiblaphp/cache.svg?style=flat-square)](https://packagist.org/packages/hiblaphp/cache)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
 
 ---
