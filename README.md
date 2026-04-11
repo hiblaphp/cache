@@ -53,7 +53,7 @@ composer require hiblaphp/cache
 ```
 
 **Requirements:**
-- PHP 8.3+
+- PHP 8.4+
 - `hiblaphp/promise`
 
 ---
