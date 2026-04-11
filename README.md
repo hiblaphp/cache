@@ -2,7 +2,7 @@
 
 **Async-first cache primitives for the Hibla ecosystem.**
 
-A Promise-based cache abstraction built on top of [hiblaphp/promise](https://github.com/hiblaphp/promise). All operations return a `Promise` rather than a raw value, making cache reads and writes first-class participants in async workflows, composable with `await()`, `Promise::all()`, and the rest of the Hibla promise API.
+A Promise-based cache abstraction built on top of [hiblaphp/promise](https://github.com/hiblaphp/promise) inspired by psr16 cache interface. All operations return a `Promise` rather than a raw value, making cache reads and writes first-class participants in async workflows, composable with `await()`, `Promise::all()`, and the rest of the Hibla promise API.
 
 Ships with an in-memory `ArrayCache` implementation with LRU eviction and nanosecond-precision TTL, and a `CacheInterface` for building or swapping in other backends.
 
