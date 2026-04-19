@@ -26,6 +26,7 @@ Ships with an in-memory `ArrayCache` implementation with LRU eviction and nanose
   - [DateInterval TTL](#dateinterval-ttl)
 - [Size Limit and LRU Eviction](#size-limit-and-lru-eviction)
   - [Eviction priority](#eviction-priority)
+  - [Eviction hook (`onEvict`)](#eviction-hook-onevict)
 - [Bulk Operations](#bulk-operations)
   - [`getMultiple()`](#getmultiple)
   - [`setMultiple()`](#setmultiple)
@@ -181,6 +182,22 @@ await($cache->set('d', 4));
 $b = await($cache->get('b')); // null — evicted
 $a = await($cache->get('a')); // 1 — still present
 ```
+
+### Eviction hook (`onEvict`)
+
+You can pass a callback as the second argument to the `ArrayCache` constructor to be notified whenever an item is **automatically evicted** from the cache. The callback receives the evicted `$key` and its `$value`.
+
+This is particularly useful when you are caching resources that require explicit cleanup (like file handles, network sockets, or prepared statements) and you want to guarantee they are closed the moment they fall out of the cache:
+
+```php
+$cache = new ArrayCache(limit: 100, onEvict: function (string $key, mixed $value) {
+    if ($value instanceof ResourceInterface) {
+        $value->close();
+    }
+});
+```
+
+> **Note:** The eviction hook only fires for *automatic* evictions (when the LRU capacity limit is reached and an item is pushed out, or when a TTL expiration is lazily discovered during a read). It does **not** fire when you manually call `delete()`, `clear()`, or explicitly overwrite an existing key with `set()`.
 
 ---
 
@@ -398,7 +415,7 @@ class RedisCache implements CacheInterface
 
 | Method | Description |
 |---|---|
-| `__construct(?int $limit = null)` | Create a cache. Pass a limit to cap the number of items. Null for unlimited. Throws `\InvalidArgumentException` if limit is less than 1. |
+| `__construct(?int $limit = null, ?callable $onEvict = null)` | Create a cache. Pass a limit to cap the number of items. Pass an optional `$onEvict` callback to handle automatic evictions. Null for unlimited. Throws `\InvalidArgumentException` if limit is less than 1. |
 | `get(string $key, mixed $default = null): PromiseInterface` | Resolve with the cached value, or `$default` on miss. Checks expiry lazily. Updates LRU order on hit. |
 | `set(string $key, mixed $value, mixed $ttl = null): PromiseInterface` | Store a value. TTL accepts `int`, `float`, or `DateInterval`. Resolves with `true`. Evicts if over limit. |
 | `delete(string $key): PromiseInterface` | Remove a key. Resolves with `true`. |
