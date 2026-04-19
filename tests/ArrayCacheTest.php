@@ -587,6 +587,120 @@ describe('Array Cache', function () {
         });
     });
 
+    describe('onEvict hook', function () {
+        it('triggers when item is evicted due to LRU limit', function () {
+            $evicted = [];
+            $cache = new ArrayCache(2, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1')->wait();
+            $cache->set('key2', 'value2')->wait();
+            // This set will cause key1 to be evicted
+            $cache->set('key3', 'value3')->wait();
+
+            expect($evicted)->toBe(['key1' => 'value1']);
+        });
+
+        it('triggers when expired item is evicted during get', function () {
+            $evicted = [];
+            $cache = new ArrayCache(null, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1', 0.001)->wait();
+            usleep(2000);
+
+            // Accessing triggers lazy eviction
+            $cache->get('key1')->wait();
+
+            expect($evicted)->toBe(['key1' => 'value1']);
+        });
+
+        it('triggers when expired item is evicted during has', function () {
+            $evicted = [];
+            $cache = new ArrayCache(null, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1', 0.001)->wait();
+            usleep(2000);
+
+            // Checking existence triggers lazy eviction
+            $cache->has('key1')->wait();
+
+            expect($evicted)->toBe(['key1' => 'value1']);
+        });
+
+        it('triggers when expired item is evicted during getMultiple', function () {
+            $evicted = [];
+            $cache = new ArrayCache(null, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1', 0.001)->wait();
+            $cache->set('key2', 'value2')->wait();
+            usleep(2000);
+
+            // Fetching multiple triggers lazy eviction for the expired key
+            $cache->getMultiple(['key1', 'key2'])->wait();
+
+            expect($evicted)->toBe(['key1' => 'value1']);
+        });
+
+        it('triggers when expired item is evicted to make room for new item during set', function () {
+            $evicted = [];
+            $cache = new ArrayCache(2, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1', 0.001)->wait();
+            $cache->set('key2', 'value2')->wait();
+            usleep(2000);
+
+            // Setting a 3rd item forces eviction. key1 is expired, so it's picked over key2
+            $cache->set('key3', 'value3')->wait();
+
+            expect($evicted)->toBe(['key1' => 'value1']);
+        });
+
+        it('does NOT trigger on manual delete', function () {
+            $evicted = [];
+            $cache = new ArrayCache(null, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1')->wait();
+            $cache->delete('key1')->wait();
+
+            expect($evicted)->toBeEmpty();
+        });
+
+        it('does NOT trigger on manual clear', function () {
+            $evicted = [];
+            $cache = new ArrayCache(null, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1')->wait();
+            $cache->clear()->wait();
+
+            expect($evicted)->toBeEmpty();
+        });
+
+        it('does NOT trigger when overwriting an existing key', function () {
+            $evicted = [];
+            $cache = new ArrayCache(null, function ($key, $value) use (&$evicted) {
+                $evicted[$key] = $value;
+            });
+
+            $cache->set('key1', 'value1')->wait();
+            $cache->set('key1', 'value2')->wait();
+
+            expect($evicted)->toBeEmpty();
+        });
+    });
+
     describe('edge cases', function () {
         it('handles very large cache limit', function () {
             $cache = new ArrayCache(1000000);

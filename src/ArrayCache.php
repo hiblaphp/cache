@@ -25,15 +25,23 @@ class ArrayCache implements CacheInterface
     private ?int $limit;
 
     /**
+     * @var (callable(string, mixed): void)|null
+     */
+    private $onEvict;
+
+    /**
      * Simple array-based cache with LRU eviction policy.
      *
      * @param int|null $limit Maximum number of items to keep in cache.
      *                        When limit is reached, least recently used items are evicted (LRU).
      *                        Expired items are prioritized for eviction before LRU items.
      *                        Null for unlimited cache.
+     * @param (callable(string, mixed): void)|null $onEvict Optional callback executed when an item is
+     *                                                      automatically evicted due to TTL expiration or capacity limits.
+     *                                                      Receives the evicted key and value.
      * @throws \InvalidArgumentException If limit is less than 1
      */
-    public function __construct(?int $limit = null)
+    public function __construct(?int $limit = null, ?callable $onEvict = null)
     {
         if ($limit !== null && $limit < 1) {
             throw new \InvalidArgumentException(
@@ -42,6 +50,7 @@ class ArrayCache implements CacheInterface
         }
 
         $this->limit = $limit;
+        $this->onEvict = $onEvict;
     }
 
     /**
@@ -56,7 +65,7 @@ class ArrayCache implements CacheInterface
     public function get(string $key, mixed $default = null): PromiseInterface
     {
         if (isset($this->expires[$key]) && hrtime(true) > $this->expires[$key]) {
-            unset($this->data[$key], $this->expires[$key]);
+            $this->triggerEviction($key);
         }
 
         if (! \array_key_exists($key, $this->data)) {
@@ -98,7 +107,7 @@ class ArrayCache implements CacheInterface
             }
 
             if ($expiredKey !== null) {
-                unset($this->data[$expiredKey], $this->expires[$expiredKey]);
+                $this->triggerEviction($expiredKey);
             }
         }
 
@@ -143,7 +152,7 @@ class ArrayCache implements CacheInterface
 
         foreach ($keys as $key) {
             if (isset($this->expires[$key]) && $now > $this->expires[$key]) {
-                unset($this->data[$key], $this->expires[$key]);
+                $this->triggerEviction($key);
             }
 
             if (! \array_key_exists($key, $this->data)) {
@@ -197,7 +206,7 @@ class ArrayCache implements CacheInterface
     public function has(string $key): PromiseInterface
     {
         if (isset($this->expires[$key]) && hrtime(true) > $this->expires[$key]) {
-            unset($this->data[$key], $this->expires[$key]);
+            $this->triggerEviction($key);
         }
 
         if (! \array_key_exists($key, $this->data)) {
@@ -210,6 +219,23 @@ class ArrayCache implements CacheInterface
         // Only get() and getMultiple() update LRU when values are actually retrieved.
 
         return Promise::resolved(true);
+    }
+
+    /**
+     * Removes an item from the cache and triggers the eviction hook.
+     */
+    private function triggerEviction(string $key): void
+    {
+        if (! \array_key_exists($key, $this->data)) {
+            return;
+        }
+
+        $value = $this->data[$key];
+        unset($this->data[$key], $this->expires[$key]);
+
+        if ($this->onEvict !== null) {
+            ($this->onEvict)($key, $value);
+        }
     }
 
     /**
